@@ -1,73 +1,110 @@
-# Day 1 Task: Comparing a Plain Chatbot, a Rule-Based Workflow, and an AI Agent
+# Day 2 Task: Reasoning and Acting
 
 ## 1. Scenario
 
-For this task, I chose a small **Student Academic Assistant** scenario. The system uses a local student record that contains attendance percentages for DBMS, AI, and CN, along with information about pending assignments and their due time.
+For this task, I continued with the Student Academic Assistant scenario. The system works with private student academic information such as attendance percentages and pending assignments.
 
-I used the same student information with three different approaches: a plain chatbot, a rule-based workflow, and an AI agent. The main purpose is to understand how each approach works and how their behavior changes when the same problem is solved in different ways.
+The student data used in the experiment contains the following attendance values: DBMS 82%, AI 91%, and CN 76%. The assignment information shows that DBMS has been submitted, while AI has 2 days remaining and CN has 5 days remaining.
 
-In this scenario, the plain chatbot mainly uses an LLM to generate answers, the rule-based workflow follows predefined conditions without using an LLM, and the AI agent combines an LLM, tools, and a loop to complete the task.
+The purpose of this task is to compare three approaches for solving questions in this scenario: Direct Prompting, Chain-of-Thought (CoT), and a ReAct agent. I also performed a self-consistency experiment using repeated Chain-of-Thought runs.
 
-## 2. Plain Chatbot
+---
 
-The plain chatbot gets the student's private information through the conversation context. The student data and the question are sent to the LLM, and the LLM generates the answer.
+## 2. Direct Prompting
 
-There are no separate tools in this approach. The chatbot simply uses the information provided in its prompt to answer the question.
+Direct prompting asks the language model to provide an answer directly without showing its reasoning and without using tools.
 
-One advantage is that the chatbot can understand different ways of asking the same question because the LLM can interpret natural language. However, it can only work with the private information that is provided to it in the conversation. It also does not have a separate tool for retrieving data or doing calculations.
+In my experiment, the direct prompt was tested with several attendance-related questions. For the question asking for the AI attendance percentage, the model returned 75%. However, the actual student data contains an AI attendance of 91%. This showed that the model could give an answer even when it did not have access to the private student data.
 
-For example, if I ask, **"What is my attendance in AI?"**, the chatbot uses the attendance information given in its context and generates the answer.
+For the average attendance question, the direct response calculated the average as 83%, which was correct. For the question involving additional classes, the response calculated the updated attendance values as 83.64% for DBMS and 78.18% for CN.
 
-## 3. Rule-Based Workflow
+For the question asking which subject had the highest attendance, the direct response answered DBMS. However, according to the actual student data, AI has the highest attendance at 91%.
 
-The rule-based workflow works differently because it does not use an LLM. Instead, it uses Python code and predefined conditions.
+These results show that direct prompting can work for calculations when the required values are available in the question, but it can produce unsupported or incorrect answers when private information is required.
 
-The student information is stored in Python dictionaries. Based on the question, the program checks the conditions and returns the required information. For example, it can find a subject's attendance, identify pending assignments, or compare attendance with 75%.
+---
 
-The main advantage of this approach is that the result is predictable for the questions covered by the rules. However, it is less flexible. If the user asks a question that was not considered while writing the rules, the program may not understand it. To support new types of questions, additional conditions have to be added to the code.
+## 3. Chain-of-Thought
 
-For example, when the user asks about CN attendance and the 75% requirement, the workflow follows the predefined condition and calculates the difference.
+Chain-of-Thought prompting asks the model to solve a problem step by step before giving the final answer. This approach makes the calculation or reasoning process more visible.
 
-## 4. AI Agent
+In my experiment, Chain-of-Thought correctly calculated the average attendance as 83%. It also correctly calculated the updated attendance values as 83.64% for DBMS and 78.18% for CN.
 
-The AI agent follows the idea of **LLM + Tools + Loop**.
+However, Chain-of-Thought could not retrieve the private attendance information when it was not included in the question. For the question asking which subject had the highest attendance, the model stated that it needed the attendance values to determine the answer. It also could not independently retrieve the AI attendance value.
 
-In this approach, the LLM receives the user's question and decides which tool is needed. The tools can be used to access the student's attendance, find pending assignments, or perform calculations.
+This demonstrates that step-by-step reasoning does not provide access to private information. Chain-of-Thought can reason over information available to the model, but it cannot fetch missing facts from the application's private data by itself.
 
-After a tool is called, its result is returned to the agent. The agent can then use that result and decide whether another tool is required. This process continues until the agent has enough information to give the final answer.
+---
 
-For example, if the user asks whether their CN attendance is above 75%, the agent can first use the attendance tool to get the CN attendance. It can then use the calculator tool to find the difference between the attendance and 75%.
+## 4. ReAct Agent
 
-This makes the agent more flexible and useful for multi-step questions. At the same time, it is more complex to implement because the tools and the tool-calling loop have to work correctly.
+The ReAct approach combines reasoning with actions. The agent can decide that it needs additional information, call a tool, observe the result, and then continue to the final answer.
+
+The existing Student Academic Assistant contains tools for accessing student information, including `get_attendance()` and `get_pending_assignments()`.
+
+For the ReAct experiment, I asked:
+
+"Which assignments are currently pending, and how many days are left for each?"
+
+The agent identified that it needed the pending-assignment information and called the `get_pending_assignments()` tool. The tool returned that AI had 2 days remaining and CN had 5 days remaining.
+
+The agent then used the tool result to produce the final answer. The output therefore demonstrated the ReAct process of using a tool, receiving an observation, and then producing a final response.
+
+This shows how ReAct can handle questions that require private information stored outside the model's direct knowledge.
+
+---
 
 ## 5. Comparison Table
 
-| Basis for comparison | Plain Chatbot | Rule-Based Workflow | AI Agent |
+| Basis for comparison | Direct Prompting | Chain-of-Thought | ReAct Agent |
 |---|---|---|---|
-| Flexibility | Can understand different natural-language questions | Works mainly with predefined question patterns | Can understand different questions and decide which tools to use |
-| Decision-making | The LLM generates the response | Decisions are made using fixed conditions | The LLM decides which tool or action is needed |
-| Tool usage | No separate tools | Uses predefined Python rules and data | Uses attendance, assignment, and calculator tools |
-| Private-data access | Private data is given through the prompt/context | Directly accesses local student data | Accesses private data through tools |
-| Multi-step task handling | Limited in this implementation | Must be manually programmed | Can perform multiple tool calls in a loop |
-| Automation | Automatically generates responses | Automatically follows fixed rules | Can automatically select and use tools |
-| Reliability | Depends on the generated response | Predictable for supported rules | Depends on both the tools and the model's tool selection |
+| Reasoning depth | Gives a direct answer without visible reasoning. | Performs step-by-step reasoning and shows the steps. | Combines reasoning with tool actions and observations. |
+| Tool usage | No tool usage. | No tool usage in this experiment. | Uses tools when additional student information is required. |
+| Reliability on multi-step questions | Can solve some calculations but may give unsupported answers when information is missing. | Performs multi-step calculations more explicitly when the required information is available. | Can combine reasoning with information retrieved from tools. |
+| Transparency | The response does not show the reasoning process. | The reasoning steps are shown in the response. | Tool calls and their returned observations are visible in the trace. |
+| Speed / cost | Usually requires a direct model response and is relatively simple. | Produces longer responses because reasoning steps are included. | May require multiple model and tool interactions. |
+| Consistency across repeated runs | Can vary depending on model settings. | Can vary at non-zero temperature. | Tool results remain tied to the underlying data, although generated responses can still vary. |
 
-## 6. Suitability Analysis
+---
 
-The three approaches can all be used for the Student Academic Assistant, but they work differently depending on the type of question.
+## 6. Self-Consistency Observation
 
-A **plain chatbot** is useful when the main requirement is to have a natural conversation and the required information can simply be provided in the prompt. It is easy to use and can handle different ways of asking a question.
+For the self-consistency experiment, I used the question:
 
-A **rule-based workflow** is useful when the questions and conditions are already known. For example, if the system only needs to check attendance, list pending assignments, and apply a fixed percentage rule, predefined Python rules can handle these tasks in a predictable way.
+"A student has 82% attendance in DBMS, 91% in AI, and 76% in CN. What is the average attendance percentage?"
 
-An **AI agent** is useful when the user may ask different types of questions and the task may require more than one action. In this project, the agent can access private information through tools and can perform multiple steps before giving the final response.
+The correct calculation is:
 
-Therefore, the suitable approach depends on the requirements of the problem. A fixed task can be handled using rules, a simple conversational task can use a chatbot, and a task involving flexible questions and multiple tool-based actions can use an AI agent.
+(82 + 91 + 76) / 3 = 83%
 
-## 7. Conclusion
+I first ran the Chain-of-Thought prompt five times with a temperature of 0.8. The displayed final answers were all 83%. The program reported a majority count of 4 out of 5 because some returned strings contained small formatting differences. Therefore, the semantic answer across the displayed runs was 83%, and it was correct.
 
-Through this task, I understood that a chatbot, a rule-based workflow, and an AI agent can solve the same problem in three different ways.
+I then repeated the experiment with temperature 0. All five runs produced 83%, and the program reported a majority count of 5 out of 5.
 
-A **plain chatbot** mainly depends on an LLM to understand the question and generate a response. A **rule-based workflow** does not use an LLM and instead follows conditions that have already been programmed. An **AI agent** combines an LLM with tools and a loop, allowing it to select actions, receive results, and continue working until it can answer the user's request.
+This experiment showed that the repeated outputs were more consistent at temperature 0 for this question. It also showed that self-consistency depends on how final answers are extracted and compared because small formatting differences can affect exact string-based counting.
 
-In general, a chatbot is useful when conversational responses are the main requirement. A rule-based workflow is useful for predictable tasks with clearly defined conditions. An AI agent is useful when a task requires flexible understanding, controlled access to data, tool usage, and multiple steps.
+---
+
+## 7. Suitability Analysis
+
+The experiment shows that the three approaches are useful for different types of questions in the Student Academic Assistant scenario.
+
+Direct Prompting is useful when the required information is already available to the model and a short answer is sufficient. It is simple and fast, but my experiment showed that it can produce an incorrect answer when private student information is not available in the prompt.
+
+Chain-of-Thought is useful for questions involving calculations or multiple reasoning steps. In my experiment, it correctly calculated the average attendance and the updated attendance percentages. However, it could not retrieve private attendance information that was not provided in the question.
+
+ReAct is useful when the question requires information from a private data source or tool. In my experiment, the ReAct agent used `get_pending_assignments()` and obtained the current assignment information before producing its final answer.
+
+Therefore, the choice of approach depends on the problem. Direct Prompting can handle straightforward questions, Chain-of-Thought can help with multi-step reasoning, and ReAct can be used when reasoning needs to be combined with external or private information.
+
+---
+
+## 8. Conclusion
+
+This task demonstrated the differences between Direct Prompting, Chain-of-Thought, and ReAct using a Student Academic Assistant scenario.
+
+Direct Prompting generates an answer directly without visible reasoning or tool access. Chain-of-Thought makes the reasoning steps explicit and can help with multi-step calculations, but it cannot retrieve information that is not available to the model. ReAct combines reasoning with actions and observations, allowing the agent to use tools when additional information is required.
+
+The experiments showed that the three approaches have different uses. Direct Prompting is suitable for simple questions where the required information is already available. Chain-of-Thought is useful for problems that require several reasoning or calculation steps. ReAct is useful when the task requires access to private data or other tool-based information.
+
+The self-consistency experiment also showed that repeated Chain-of-Thought runs can be compared to identify a majority answer, while temperature 0 produced identical answers across the five runs for the tested question.
